@@ -2,7 +2,7 @@
 
 Paste a suspicious SMS or WhatsApp forward and get a risk verdict, with every piece of evidence shown, backed by a crowd-reported scam database.
 
-CS341 Web Technologies final group project: PHP, MySQL, jQuery. No framework.
+CS341 Web Technlogies final group project: PHP, MySQL, jQuery. No framework.
 
 > This README is a Phase 01 starter written by M1. **M5 owns the final README**: schema diagram, test accounts, accuracy table and known limitations get added before submission.
 
