@@ -1,0 +1,23 @@
+# --- Secrets: never committed. Copy .env.example to .env instead. ---
+.env
+.env.*
+!.env.example
+
+# --- Runtime output ---
+storage/logs/*
+!storage/logs/.gitkeep
+!storage/logs/.htaccess
+
+# --- Tooling / OS noise ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+/vendor/
+node_modules/
+
+# --- Local dumps and exports (may contain real data) ---
+*.sql.gz
+*.zip
+dump*.sql

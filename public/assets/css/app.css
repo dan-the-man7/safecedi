@@ -1,0 +1,51 @@
+/*
+ * Placeholder styles so the Phase 01 skeleton is usable on a phone.
+ * M4 replaces this with the real token file (colours, type scale, spacing,
+ * the four band colours). Keep class names or update the templates with it.
+ */
+:root {
+  --c-bg: #f7f8fa;
+  --c-surface: #ffffff;
+  --c-text: #1d2433;
+  --c-muted: #5b6475;
+  --c-accent: #0b5fff;
+  --c-border: #dde1e8;
+  --c-ok: #1f7a3d;
+  --c-error: #b42318;
+  --space: 1rem;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--c-bg); color: var(--c-text); line-height: 1.5; }
+a { color: var(--c-accent); }
+
+.site-header { display: flex; flex-wrap: wrap; gap: var(--space); align-items: center; justify-content: space-between; padding: .75rem var(--space); background: var(--c-surface); border-bottom: 1px solid var(--c-border); }
+.brand { font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--c-text); }
+.site-header nav { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.inline { display: inline; margin: 0; }
+.link-button { background: none; border: 0; padding: 0; color: var(--c-accent); font: inherit; text-decoration: underline; cursor: pointer; }
+
+.container { max-width: 40rem; margin: 0 auto; padding: var(--space); }
+.card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: var(--space); margin-bottom: var(--space); }
+
+label { display: block; font-weight: 600; margin-top: var(--space); }
+input[type=text], input[type=email], input[type=password], textarea { width: 100%; padding: .65rem; font: inherit; border: 1px solid var(--c-border); border-radius: var(--radius); background: #fff; }
+textarea { min-height: 9rem; resize: vertical; }
+.hint { color: var(--c-muted); font-size: .9rem; margin: .25rem 0 0; }
+.field-error { color: var(--c-error); font-size: .9rem; margin: .25rem 0 0; }
+button.primary { margin-top: var(--space); padding: .7rem 1.2rem; font: inherit; font-weight: 600; color: #fff; background: var(--c-accent); border: 0; border-radius: var(--radius); cursor: pointer; width: 100%; }
+
+.flash { padding: .75rem var(--space); border-radius: var(--radius); margin-bottom: var(--space); border: 1px solid var(--c-border); background: var(--c-surface); }
+.flash-success { border-color: var(--c-ok); }
+.flash-error { border-color: var(--c-error); color: var(--c-error); }
+
+.signals { padding-left: 1.2rem; }
+.score { font-size: 2rem; font-weight: 700; margin: 0; }
+.message-echo { white-space: pre-wrap; word-break: break-word; background: var(--c-bg); padding: .75rem; border-radius: var(--radius); }
+
+.site-footer { color: var(--c-muted); font-size: .85rem; text-align: center; padding: 2rem var(--space); }
+
+@media (min-width: 768px) {
+  button.primary { width: auto; }
+}

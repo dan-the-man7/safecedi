@@ -1,0 +1,24 @@
+# Root .htaccess  (owner: M1)
+#
+# Best setup: point the host's document root at public/ and this file is
+# never used. Many shared hosts don't allow that, so this is the fallback:
+# every request is rewritten into public/, which means includes/, .env,
+# database/, bin/ and the rest can never be fetched over the web.
+
+Options -Indexes
+
+# Refuse dotfiles (.env, .git, .htaccess) outright, even if rewriting fails.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# If mod_rewrite is missing, fail closed: nothing at the root is served.
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
