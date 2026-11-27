@@ -6,7 +6,7 @@ Each member adds **their own row** as their first commit, on a branch named `doc
 |---|---|---|---|
 | M1 | | | Team Lead & Integration: repo, deploy, config/secrets, auth & sessions, nightly merge, submission |
 | M2 | | | Data & Backend Core: schema, seed/corpus, db.php, queries, indexes |
-| M3 | | | Signature Feature: rule engine `evaluate()`, SSRF guard, link resolver |
+| M3 | Daniel Darko | darko-jr | Signature Feature: rule engine `evaluate()`, SSRF guard, link resolver |
 | M4 | | | Interface & Experience: CSS tokens, responsive shell, jQuery, empty/loading/error states |
 | M5 | | | Security, QA & Evidence: threat model, validation table, CSRF/escaping, test plan, README |
 
