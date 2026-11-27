@@ -8,8 +8,8 @@ declare(strict_types=1);
 // (M5 owns the official harness; this is M3's quick check while tuning rules.
 //  Agree the column names with M2 and adjust the two lines marked ADJUST.)
 
-require __DIR__ . '/../src/Rules.php';
-require __DIR__ . '/../src/Engine.php';
+require __DIR__ . '/../engine/Rules.php';
+require __DIR__ . '/../engine/Engine.php';
 
 use SafeCedi\Engine;
 use SafeCedi\Rules;

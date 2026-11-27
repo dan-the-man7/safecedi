@@ -27,7 +27,7 @@ namespace SafeCedi;
 final class Engine
 {
     public const VERSION = '0.1.0-phase1';
-    public const MAX_INPUT_CHARS = 2000;   // bounds regex work on hostile input
+    public const MAX_INPUT_CHARS = 5000;   // bounds regex work on hostile input
     public const MAX_SCORE = 100;
 
     /** @param array<int,array<string,mixed>> $rules */

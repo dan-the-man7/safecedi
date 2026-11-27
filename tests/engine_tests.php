@@ -2,9 +2,9 @@
 declare(strict_types=1);
 
 // Run with:  php tests/run_tests.php
-require __DIR__ . '/../src/Rules.php';
-require __DIR__ . '/../src/Engine.php';
-require __DIR__ . '/../src/SsrfGuard.php';
+require __DIR__ . '/../engine/Rules.php';
+require __DIR__ . '/../engine/Engine.php';
+require __DIR__ . '/../engine/SsrfGuard.php';
 
 use SafeCedi\Engine;
 use SafeCedi\Rules;
