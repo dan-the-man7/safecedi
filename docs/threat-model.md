@@ -1,146 +1,433 @@
-# Threat model
+SAFECEDI – THREAT MODEL
 
-**Owner: M5 (Security, QA & Evidence).** Phase 01 deliverable, first written 19 Nov 2026. Notes marked **(M1 review)** were added during integration. M5 should confirm, edit or remove them.
+Owner: M5 (Security, QA & Evidence)
+Phase 01 Deliverable
+Originally written: 19 November 2026
 
-## 1. What SafeCedi is, from an attacker's point of view
+⸻
 
-SafeCedi helps people in Ghana spot fraudulent mobile-money messages, suspicious links and phishing. Anyone can paste a suspicious SMS or WhatsApp message, with no account needed, and get a risk band (Looks Safe, Unclear, Suspicious, Dangerous) with the evidence behind it. It looks at language patterns, sender details, URLs and reputation data.
+1. What SafeCedi Is, from an Attacker’s Point of View
 
-Two things make it a target:
+SafeCedi helps people in Ghana identify fraudulent mobile-money messages, suspicious links and phishing attempts. Anyone can paste a suspicious SMS or WhatsApp message without creating an account and receive a risk band — Looks Safe, Unclear, Suspicious or Dangerous — together with the evidence behind the assessment.
 
-- It **accepts text from anyone**, including people who are not logged in. The submission form is the main attack surface.
-- It will **fetch URLs that strangers choose**, to follow redirect chains. That makes server-side request forgery (SSRF) the headline risk.
+The application analyses language patterns, sender details, URLs and reputation data.
 
-## 2. Assets to protect
+Two characteristics make SafeCedi a potential target:
 
-| Asset | What it is | Why it matters |
-|---|---|---|
-| User accounts | Login credentials and account details | Prevent unauthorised access |
-| Submitted messages | Messages pasted in for analysis | User privacy |
-| Extracted URLs | Links pulled out of submitted messages | Prevent malicious outbound requests |
-| Verdict records | Scores, risk bands and evidence | Accuracy and integrity |
-| Database | Users, submissions, reports, rules, feedback | Prevent unauthorised reading or changes |
-| API credentials | Google Safe Browsing API key | Prevent abuse of our quota |
-| Moderation system | Tools moderators use to manage reports | Prevent unauthorised admin actions |
+* Public input: Anyone, including unauthenticated users, can submit text for analysis. The submission form is a major attack surface.
+* External URL fetching: SafeCedi retrieves URLs submitted by users and follows redirect chains. This creates a significant Server-Side Request Forgery (SSRF) risk.
 
-## 3. Threats
+⸻
 
-### Threat 1: Server-side request forgery (SSRF)
+2. Assets to Protect
 
-**What it is.** An attacker tricks the server into making requests to internal or restricted addresses. SafeCedi follows links from submitted messages. Without checks, someone could submit a link pointing at `127.0.0.1`, a private network address, or the cloud metadata address `169.254.169.254`, and our server would fetch it for them.
+Asset	What It Is	Why It Matters
+User accounts	Login credentials and account details	Prevent unauthorised access
+Submitted messages	Messages pasted for analysis	Protect user privacy
+Extracted URLs	Links extracted from submitted messages	Prevent malicious outbound requests
+Verdict records	Scores, risk bands and supporting evidence	Maintain accuracy and integrity
+Database	Users, submissions, reports, rules and feedback	Prevent unauthorised reading or modification
+API credentials	Google Safe Browsing API key	Prevent abuse of API quota
+Moderation system	Tools moderators use to manage reports	Prevent unauthorised administrative actions
 
-**Impact**
-- Access to internal services
-- Exposure of server information or cloud credentials
-- Access to restricted network resources
-- Possible compromise of the hosting environment
+⸻
 
-**Mitigations**
-- Resolve the hostname before making any HTTP request
-- Refuse private, loopback and link-local addresses
-- Allow only `http` and `https`
-- At most five redirect hops
-- Re-check the destination address on **every** hop, not just the first
-- Timeouts and response-size limits
-- Log refused requests
+3. Threats
 
-**Where it lives in the code.** `engine/SsrfGuard.php` (M3): `SsrfGuard::check()` decides whether a URL may be fetched. It has 5 hops, 256 KB and 5 seconds as constants, and `pinnedResolveEntry()` makes cURL connect to the address that was checked, so DNS can't change between the check and the fetch.
+Threat 1: Server-Side Request Forgery (SSRF)
 
-> **(M1 review)** The guard returns a `reason` but does not log anything itself. Whoever writes the link resolver (M3, Phase 03) must call `app_log('warning', 'ssrf_refused', [...])` on every refusal, or test TC15 can't pass.
+What it is
+
+An attacker tricks the server into making requests to internal or restricted addresses.
+
+SafeCedi follows links extracted from submitted messages. Without proper validation, an attacker could submit a URL pointing to 127.0.0.1, a private network address or the cloud metadata address 169.254.169.254, causing the server to fetch it.
+
+Impact
+
+* Access to internal services.
+* Exposure of server information or cloud credentials.
+* Access to restricted network resources.
+* Possible compromise of the hosting environment.
+
+Mitigations
+
+* Resolve the hostname before making any HTTP request.
+* Refuse private, loopback and link-local IP addresses.
+* Allow only HTTP and HTTPS protocols.
+* Limit redirect chains to a maximum of five hops.
+* Re-check the destination IP address at every redirect.
+* Use connection timeouts and response-size limits.
+* Log refused requests using the application’s logging system.
+
+Whenever the URL resolver refuses a URL, it must record a warning using:
+
+app_log('warning', 'ssrf_refused', [...]);
+
+The log should contain relevant security information without unnecessarily recording sensitive user-submitted message content.
+
+Where it Lives in the Code
+
+engine/SsrfGuard.php (M3)
+
+SsrfGuard::check() determines whether a URL may be fetched. The guard uses limits of:
+
+* 5 redirect hops
+* 256 KB maximum response size
+* 5 seconds timeout
+
+pinnedResolveEntry() makes cURL connect to the address that was checked, preventing DNS changes between validation and connection.
 
 SSRF is the headline risk in the project plan.
 
-### Threat 2: SQL injection
+⸻
 
-**What it is.** An attacker puts SQL syntax into an input to change what a database query does. Possible entry points: submitted messages, URLs, login forms, report submissions.
+Threat 2: SQL Injection
 
-**Impact.** Records read, changed or deleted, and user data exposed.
+What it is
 
-**Mitigations**
-- PDO prepared statements for every query: `db_run()` and `db_one()` in `includes/db.php` (real prepared statements, emulation off)
-- Never join user input into SQL strings
-- Validate input on the server
-- The production database user gets only `SELECT, INSERT, UPDATE, DELETE` (see `docs/deploy-guide.md`, Step 2)
+An attacker inserts SQL syntax into an input to manipulate the application’s database queries.
 
-### Threat 3: Cross-site scripting (XSS)
+Potential entry points include:
 
-**What it is.** Malicious script injected through user content runs in another user's browser. SafeCedi stores and redisplays messages, URLs, reports and feedback, and scam messages are by nature hostile text.
+* Submitted messages.
+* URLs.
+* Login forms.
+* Report submissions.
+* Feedback forms.
 
-**Impact.** Session theft, actions taken in someone else's name, tampered pages, compromised moderator accounts.
+Impact
 
-**Mitigations**
-- Escape every user-supplied value at the point of printing with `e()` (`includes/security.php`, which uses `htmlspecialchars` with `ENT_QUOTES | ENT_SUBSTITUTE`, UTF-8)
-- Never insert untrusted content into HTML, attributes or JavaScript unescaped
-- Validate input before storing it
-- The session cookie is `HttpOnly`, so a script can't read it
-- A Content Security Policy
+* Records read, changed or deleted.
+* User data exposed.
+* Database integrity compromised.
 
-> **(M1 review)** The site does not send a Content-Security-Policy header yet. Adding one to `send_security_headers()` is an M5 task. It must allow Google Fonts (M4's CSS imports them) and wherever jQuery is loaded from.
+Mitigations
 
-### Threat 4: Cross-site request forgery (CSRF)
+* Use PDO prepared statements for every database query.
+* Use db_run() and db_one() in includes/db.php, with real prepared statements and emulation disabled.
+* Never concatenate user input directly into SQL statements.
+* Validate input on the server.
+* Restrict the production database user to only the required privileges: SELECT, INSERT, UPDATE and DELETE.
 
-**What it is.** Another website tricks a logged-in user's browser into submitting a form to SafeCedi, for example making a moderator approve or delete a report without knowing.
+The production database permissions are documented in docs/deploy-guide.md, Step 2.
 
-**Impact.** Reports changed, account changes, unauthorised moderation.
+⸻
 
-**Mitigations**
-- A random token per session: `bin2hex(random_bytes(32))`
-- The token in every state-changing form (`csrf_field()`)
-- Checked on the server before any write (`csrf_verify()`, a constant-time `hash_equals` compare; a missing or wrong token gets a 403)
-- Logout is a POST form with a token, not a link
-- Session cookie is `SameSite=Lax`, a second line of defence
+Threat 3: Cross-Site Scripting (XSS)
 
-### Threat 5: Unauthorised access
+What it is
 
-**What it is.** Someone reaches features their role doesn't allow, for example a reporter typing `/moderate.php`.
+Malicious scripts injected through user content execute in another user’s browser.
 
-**Impact.** Exposed user data, changed reports, abused moderator powers.
+SafeCedi stores and redisplays messages, URLs, reports and feedback. Since scam messages are inherently untrusted content, any of these fields could contain malicious HTML or JavaScript.
 
-**Mitigations**
-- Role-based access: `require_login()` and `require_role(ROLE_MODERATOR)` on the first line of every protected page
-- The role is re-read from the database on every request, so a demoted moderator loses access on their next click
-- Passwords hashed with `password_hash()` and checked with `password_verify()`
-- Login locked for 15 minutes after 5 failures
-- Session ID regenerated on login (stops session fixation); 30-minute idle timeout
+Impact
 
-### Threat 6: Denial of service and resource abuse
+* Session theft.
+* Actions performed in another user’s name.
+* Manipulated pages.
+* Compromised moderator accounts.
 
-**What it is.** Flooding the site with large messages or many URLs. Link resolution and reputation lookups are the expensive part.
+Mitigations
 
-**Impact.** Slow pages, Safe Browsing quota used up, server exhaustion, legitimate users locked out.
+* Escape every user-supplied value at the point of output using e().
+* Use htmlspecialchars() with ENT_QUOTES | ENT_SUBSTITUTE and UTF-8.
+* Never insert untrusted content into HTML, attributes or JavaScript without appropriate escaping.
+* Validate input before storing it.
+* Use the HttpOnly session cookie attribute to prevent JavaScript from reading the session cookie.
+* Implement a Content Security Policy (CSP).
 
-**Mitigations**
-- Message length limit (5,000 characters)
-- Per-IP rate limiting on submission (M1, Phase 03)
-- A cap on URLs processed per submission
-- HTTP timeouts and response-size caps
-- Safe Browsing results cached with a time limit (`reputation_cache`)
+Content Security Policy
 
-> **(M1 review)** Known limitation: the login lockout is per account, so an attacker could lock a real moderator out for 15 minutes on purpose. Per-IP throttling is the fix.
+The application must send a Content Security Policy through send_security_headers().
 
-### Threats to add (M1 review)
+The policy must restrict the sources from which scripts, styles, images, fonts and other resources may be loaded.
 
-Suggested additions for M5 to write up:
+It must account for the application’s required external resources, including:
 
-| Threat | Why it applies here | Current defence |
-|---|---|---|
-| Leaked secrets | The Safe Browsing key or DB password committed to git | `.env` is git-ignored; Phase 04 check that the key is absent from the **whole** history |
-| Session hijacking | A stolen session cookie gives someone's account | `HttpOnly`, `Secure` on HTTPS, `SameSite=Lax`, strict mode, idle timeout |
-| Privacy of submissions | People paste real messages that may contain names and numbers | Store a **hashed** IP, never the raw IP; never log full message text |
-| Information leaks in errors | Stack traces can reveal paths or the DB password | Friendly error page with a reference code; details go to the log only |
-| Open redirect | `?next=` style parameters sending users to another site | `safe_local_path()` only allows local paths |
+* Google Fonts used by M4’s CSS.
+* The source from which jQuery is loaded.
 
-## 4. Summary
+External sources should be explicitly allowlisted rather than allowing unrestricted resource loading.
 
-| Threat | Likelihood | Impact | Risk | Main mitigation |
-|---|---|---|---|---|
-| SSRF | High | Critical | **Critical** | URL and IP validation on every hop |
-| SQL injection | Medium | Critical | High | Prepared statements |
-| XSS | Medium | High | High | Output escaping |
-| CSRF | Medium | High | High | CSRF tokens |
-| Unauthorised access | Medium | High | High | Role-based access control |
-| Denial of service | Medium | High | High | Rate limiting and resource limits |
+The CSP should be tested to ensure it does not block legitimate application functionality while preventing unauthorised scripts from executing.
 
-## 5. Conclusion
+⸻
 
-SSRF is the most significant concern because SafeCedi fetches URLs that users supply. SQL injection, XSS, CSRF and unauthorised access follow. Controls must be enforced on the server. Browser-side checks are only for convenience. Each mitigation above is tested by a scenario in [test-plan.md](test-plan.md).
+Threat 4: Cross-Site Request Forgery (CSRF)
+
+What it is
+
+Another website tricks a logged-in user’s browser into submitting a form to SafeCedi.
+
+For example, an attacker could attempt to trick a moderator into approving or deleting a report without their knowledge.
+
+Impact
+
+* Reports changed without authorisation.
+* Unwanted account changes.
+* Unauthorised moderation actions.
+
+Mitigations
+
+* Generate a random token for each session using:
+
+bin2hex(random_bytes(32))
+
+* Include the token in every state-changing form using csrf_field().
+* Validate the token on the server before performing database writes using csrf_verify().
+* Compare tokens using the constant-time hash_equals() function.
+* Reject requests with missing or invalid tokens using HTTP 403.
+* Use a POST form with a CSRF token for logout instead of a link.
+* Set the session cookie to SameSite=Lax as an additional defence.
+
+⸻
+
+Threat 5: Unauthorised Access
+
+What it is
+
+An attacker accesses features or information that their role does not permit.
+
+For example, an ordinary user could attempt to access /moderate.php by manually entering the URL.
+
+Impact
+
+* Exposed user data.
+* Unauthorised modification of reports.
+* Abuse of moderator privileges.
+
+Mitigations
+
+* Implement role-based access control.
+* Use require_login() and require_role(ROLE_MODERATOR) at the beginning of every protected page.
+* Re-read the user’s role from the database on every request so a demoted moderator loses access on their next request.
+* Hash passwords using password_hash().
+* Verify passwords using password_verify().
+* Lock login attempts for 15 minutes after five failed attempts.
+* Regenerate the session ID after login to prevent session fixation.
+* Apply a 30-minute idle session timeout.
+
+⸻
+
+Threat 6: Denial of Service and Resource Abuse
+
+What it is
+
+An attacker floods the application with large messages or numerous URLs.
+
+Link resolution and reputation lookups are particularly expensive because they require external requests.
+
+Impact
+
+* Slow application response.
+* Excessive Safe Browsing API usage.
+* Server resource exhaustion.
+* Reduced availability for legitimate users.
+* Legitimate accounts being locked out.
+
+Mitigations
+
+* Limit message length to 5,000 characters.
+* Implement per-IP rate limiting on submissions.
+* Limit the number of URLs processed per submission.
+* Apply HTTP timeouts.
+* Apply response-size limits.
+* Cache Safe Browsing results using reputation_cache with an expiry time.
+* Monitor repeated requests and suspicious activity.
+
+Login Lockout Limitation
+
+The current login lockout is applied per account. This means an attacker could deliberately submit repeated failed login attempts against a real moderator’s account and cause that account to be locked for 15 minutes.
+
+This creates a potential denial-of-service risk against legitimate users.
+
+Recommended improvement: Implement per-IP throttling in addition to the account-based lockout. This would reduce the risk of an attacker deliberately locking another user’s account.
+
+⸻
+
+Threat 7: Leaked Secrets
+
+What it is
+
+Sensitive credentials may accidentally be exposed through the Git repository, application files or logs.
+
+Examples include:
+
+* Google Safe Browsing API keys.
+* Database passwords.
+* Other API credentials.
+* Secret configuration values.
+
+Impact
+
+* Unauthorised API usage.
+* Abuse of external service quotas.
+* Unauthorised database access.
+* Financial or operational damage.
+* Compromise of the hosting environment.
+
+Mitigations
+
+* Store sensitive credentials in environment variables.
+* Use .env for local configuration.
+* Ensure .env is included in .gitignore.
+* Never commit API keys or database passwords to the repository.
+* Review the repository before committing changes.
+* Check the repository’s entire Git history for accidentally committed secrets before deployment.
+* Rotate any credentials that are discovered to have been exposed.
+
+A Phase 04 deployment check must confirm that the Safe Browsing API key and other secrets are absent from the repository history.
+
+⸻
+
+Threat 8: Session Hijacking
+
+What it is
+
+An attacker obtains a user’s session cookie and uses it to impersonate that user.
+
+A stolen moderator session could allow an attacker to access privileged moderation functionality.
+
+Impact
+
+* Unauthorised account access.
+* Exposure of account information.
+* Unauthorised moderation actions.
+* Account impersonation.
+
+Mitigations
+
+* Set the session cookie to HttpOnly.
+* Set Secure when the application is running over HTTPS.
+* Use SameSite=Lax.
+* Enable strict session mode.
+* Regenerate the session ID after login.
+* Apply a 30-minute idle timeout.
+* Use HTTPS in production.
+
+These controls reduce the risk of session theft and misuse.
+
+⸻
+
+Threat 9: Privacy of Submissions
+
+What it is
+
+Users may paste real SMS or WhatsApp messages containing personal information.
+
+Messages may contain:
+
+* Names.
+* Phone numbers.
+* Transaction references.
+* Account information.
+* Financial details.
+* Other personal information.
+
+If this information is unnecessarily stored or logged, it could expose users to privacy risks.
+
+Impact
+
+* Exposure of personal information.
+* Privacy violations.
+* Potential financial or social harm.
+* Loss of user trust.
+
+Mitigations
+
+* Store hashed IP addresses rather than raw IP addresses.
+* Never log full submitted message text.
+* Avoid storing unnecessary personal information.
+* Limit access to submitted messages.
+* Apply appropriate retention rules.
+* Ensure logs contain only the information needed for troubleshooting and security monitoring.
+
+The application should collect and retain only the information required to operate SafeCedi.
+
+⸻
+
+Threat 10: Information Leaks in Errors
+
+What it is
+
+Application errors may expose sensitive technical information.
+
+For example, PHP error messages or database exceptions could reveal:
+
+* Server file paths.
+* Database details.
+* Credentials.
+* Internal application structure.
+* SQL queries.
+
+Impact
+
+* Information that helps attackers plan further attacks.
+* Exposure of sensitive configuration.
+* Increased risk of database or server compromise.
+
+Mitigations
+
+* Display a friendly error page to users.
+* Assign a reference code to unexpected errors.
+* Log technical details internally.
+* Never display stack traces or database credentials to users.
+* Disable detailed error display in production.
+
+Users should receive a message indicating that an error occurred and, where appropriate, a reference code they can provide when reporting the problem.
+
+⸻
+
+Threat 11: Open Redirect
+
+What it is
+
+An open redirect occurs when an application redirects a user to an attacker-controlled external website using a redirect parameter.
+
+For example, an attacker could create a link that appears to lead to SafeCedi but redirects the victim to a malicious website.
+
+Impact
+
+* Phishing attacks.
+* Users misled into visiting malicious websites.
+* Abuse of SafeCedi’s reputation.
+* Increased risk of credential theft.
+
+Mitigations
+
+* Validate redirect destinations.
+* Use safe_local_path() for redirect parameters such as next.
+* Allow only local application paths.
+* Reject external URLs and unsafe redirect destinations.
+
+⸻
+
+4. Threat Summary
+
+Threat	Likelihood	Impact	Risk	Main Mitigation
+SSRF	High	Critical	Critical	URL/IP validation on every hop and pinned DNS resolution
+SQL Injection	Medium	Critical	High	PDO prepared statements
+XSS	Medium	High	High	Output escaping and CSP
+CSRF	Medium	High	High	CSRF tokens
+Unauthorised Access	Medium	High	High	Role-based access control
+Denial of Service	Medium	High	High	Rate limiting and resource limits
+Leaked Secrets	Medium	Critical	High	Environment variables and Git-history checks
+Session Hijacking	Medium	High	High	Secure session configuration
+Privacy of Submissions	Medium	High	High	Data minimisation and hashed IPs
+Information Leaks in Errors	Medium	Medium	Medium	Friendly errors and internal logging
+Open Redirect	Medium	Medium	Medium	Local-path validation
+
+⸻
+
+5. Conclusion
+
+SSRF is SafeCedi’s most significant security concern because the application fetches URLs supplied by users. SQL injection, XSS, CSRF and unauthorised access are also important threats.
+
+Additional risks include leaked secrets, session hijacking, privacy violations, information leaks through errors, open redirects and denial-of-service attacks.
+
+Security controls must be enforced on the server. Browser-side validation is only for convenience and cannot replace server-side security.
+
+Each mitigation must be verified through an appropriate test scenario in test-plan.md. Testing must distinguish between controls that have already been implemented and those that remain planned or require integration.
+
+SafeCedi’s security approach should follow the principle of minimising trust: all user input, submitted messages, URLs, external responses and redirect destinations must be treated as potentially malicious until validated.
