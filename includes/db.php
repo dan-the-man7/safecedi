@@ -1,14 +1,5 @@
 <?php
-/**
- * Database connection  (owner: M2 — minimal version written by M1 so auth
- * could ship in Phase 01. M2: extend freely, keep the db() signature.)
- *
- * Rules this enforces:
- *   - ERRMODE_EXCEPTION: a failed query throws; it is never silently ignored.
- *   - EMULATE_PREPARES off: placeholders are sent to MySQL as real prepared
- *     statements, so user data is never spliced into SQL text.
- *   - utf8mb4 so names and pasted messages with emoji survive.
- */
+
 declare(strict_types=1);
 
 function db(): PDO
@@ -55,4 +46,45 @@ function db_one(string $sql, array $params = []): ?array
 {
     $row = db_run($sql, $params)->fetch();
     return $row === false ? null : $row;
+}
+
+/** Every matching row. Empty array when nothing matched. */
+function db_all(string $sql, array $params = []): array
+{
+    return db_run($sql, $params)->fetchAll();
+}
+
+
+function db_value(string $sql, array $params = []): mixed
+{
+    $value = db_run($sql, $params)->fetchColumn();
+    return $value === false ? null : $value;
+}
+
+
+function db_insert_id(): string
+{
+    return db()->lastInsertId();
+}
+
+
+function db_begin(): void
+{
+    if (!db()->inTransaction()) {
+        db()->beginTransaction();
+    }
+}
+
+function db_commit(): void
+{
+    if (db()->inTransaction()) {
+        db()->commit();
+    }
+}
+
+function db_rollback(): void
+{
+    if (db()->inTransaction()) {
+        db()->rollBack();
+    }
 }
